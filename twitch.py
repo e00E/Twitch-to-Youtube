@@ -110,23 +110,27 @@ def download_video( video, args ):
 	print( "Done downloading", video['id'] )
 	return filename
 
-def upload_video( video, filename, args, part_number = None ):
+def get_video_title(video, part_number=None):
+	title = '{} stream from {}'.format( video['channel_name'], video['recorded_at'] )
+	if part_number is not None:
+		title += ' part {}'.format( part_number )
+	return title
+
+def upload_video( video, filename, args, youtube_uploader, part_number = None ):
 	if args.dont_use_default_tags:
 		tags = args.tags.split(",")
 	else:
 		tags = default_tags + args.tags.split(",")
-	title = '{} stream from {}'.format( video['channel_name'], video['recorded_at'] )
-	if part_number:
-		title += ' part {}'.format( part_number )
+	title = get_video_title(video, part_number)
 	description = 'Original title: {}\nOriginal description: {}\nOriginal date: {}\nOriginal Twitch id: {}'.format(
 		video['title'],
 		video['description'],
 		video['recorded_at'], video['id'] ) #not sure if the unicode encode thing is needed
 
-	youtube_uploader = YoutubeUploader(args.authentication_file, args.client_secrets_file)
 	print("Starting upload")
-	youtube_uploader.upload(filename, title, description, "20", tags, "private")
-	print( "Done uploading", video['id'] )
+	youtube_video_id = youtube_uploader.upload(filename, title, description, "20", tags, "private")
+	print( "Done uploading", video['id'], "as", youtube_video_id )
+	return youtube_video_id
 
 def split_video( filename, video_length, part_length ):
 	#All durations are in seconds
@@ -151,12 +155,16 @@ def split_video( filename, video_length, part_length ):
 			raise RuntimeError("Ffmpeg did not return 0.")
 		yield part_name
 
-def process_single_video( video, args ):
+def process_single_video( video, youtube_uploader, args ):
 	filename = download_video( video, args )
 	if video['length'] > args.split_at:
+		if not args.dont_use_playlist:
+			playlist_id = youtube_uploader.create_playlist(get_video_title(video), privacyStatus="public")['id']
 		part_number = 1
 		for part_name in split_video( filename, video['length']+1, args.split_at ):
-			upload_video( video, part_name, args, part_number )
+			youtube_video_id = upload_video( video, part_name, args, youtube_uploader, part_number )
+			if not args.dont_use_playlist:
+				youtube_uploader.add_to_playlist(playlist_id, youtube_video_id)
 			os.remove( part_name )
 			part_number += 1
 	else:
@@ -184,10 +192,12 @@ if __name__ == "__main__":
 	parser.add_argument( '--dry-run', help='Dont download or upload anything.', action='store_true' )
 	parser.add_argument( '--twitch-legacy-mode', help='Download only videos whose id start with a b instead of a v. Those videos are not created on twitch anymore but some old ones exist.', action='store_true' )
 	parser.add_argument( '--client-id', help='Your twitch application\'s client id', required=True )
+	parser.add_argument( '--dont-use-playlist', help='Do not automatically create a playlist for videos that get split in multiple parts.', action='store_true')
 	args = parser.parse_args()
 
 	headers_v3['Client-ID'] = args.client_id
-	print(headers_v3)
+
+	youtube_uploader = YoutubeUploader(args.authentication_file, args.client_secrets_file)
 
 	if args.upload_type == 'channel':
 		if args.state_file and args.start_after:
@@ -201,10 +211,7 @@ if __name__ == "__main__":
 		videos = get_videos( args.destination_id, start_after, args.twitch_legacy_mode )
 		videos.reverse()
 		for video in videos:
-			process_single_video( video, args )
+			process_single_video( video, youtube_uploader, args )
 	elif args.upload_type == 'video':
 		video = get_video( args.destination_id )
-		process_single_video( video, args )
-
-
-#TODO: if successful: delete video file
+		process_single_video( video, youtube_uploader, args )

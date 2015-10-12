@@ -16,9 +16,9 @@ VALID_PRIVACY_STATUSES = ("public", "private", "unlisted")
 
 class YoutubeUploader:
 	def __init__(self, auth_file, client_secrets_file=None):
-		YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+		YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube"
 		YOUTUBE_API_SERVICE_NAME = "youtube"
-		YOUTUBE_API_VERSION = "v3"                                                 
+		YOUTUBE_API_VERSION = "v3"
 
 		args = argparser.parse_args("")
 		args.noauth_local_webserver = True
@@ -39,6 +39,27 @@ class YoutubeUploader:
 			YOUTUBE_API_SERVICE_NAME,
 			YOUTUBE_API_VERSION,
 			http=credentials.authorize(httplib2.Http()))
+	def create_playlist(self, title, description='', privacyStatus="private"):
+		assert(privacyStatus in ["public", "private"])
+		response = self.youtube_api.playlists().insert(
+			part="snippet,status",
+			body=dict(
+				snippet=dict(
+					title=title,
+					description=description),
+				status=dict(
+					privacyStatus=privacyStatus))).execute()
+		return response
+	def add_to_playlist(self, playlist_id, video_id):
+		response = self.youtube_api.playlistItems().insert(
+			part="snippet",
+			body=dict(
+				snippet=dict(
+					playlistId=playlist_id,
+					resourceId=dict(
+						kind="youtube#video",
+						videoId=video_id)))).execute()
+		return response
 	def upload(self, filename, title=None, description=None, category=None, tags=None, privacyStatus="private"):
 		assert(privacyStatus in ["public", "private", "unlisted"])
 
