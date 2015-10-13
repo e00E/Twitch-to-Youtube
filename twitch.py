@@ -128,7 +128,7 @@ def upload_video( video, filename, args, youtube_uploader, part_number = None ):
 		video['recorded_at'], video['id'] ) #not sure if the unicode encode thing is needed
 
 	print("Starting upload")
-	youtube_video_id = youtube_uploader.upload(filename, title, description, "20", tags, "private")
+	youtube_video_id = youtube_uploader.upload(filename, title, description, "20", tags, args.privacy)
 	print( "Done uploading", video['id'], "as", youtube_video_id )
 	return youtube_video_id
 
@@ -168,7 +168,7 @@ def process_single_video( video, youtube_uploader, args ):
 			os.remove( part_name )
 			part_number += 1
 	else:
-		upload_video( video, filename, args )
+		upload_video( video, filename, args, youtube_uploader )
 	if args.state_file:
 		with open( args.state_file, 'w' ) as state_file:
 			state_file.writelines( [video['id'] + '\n'] )
@@ -193,6 +193,7 @@ if __name__ == "__main__":
 	parser.add_argument( '--twitch-legacy-mode', help='Download only videos whose id start with a b instead of a v. Those videos are not created on twitch anymore but some old ones exist.', action='store_true' )
 	parser.add_argument( '--client-id', help='Your twitch application\'s client id', required=True )
 	parser.add_argument( '--dont-use-playlist', help='Do not automatically create a playlist for videos that get split in multiple parts.', action='store_true')
+	parser.add_argument( '--privacy', help='Upload videos as public, unlisted or private', choices=['public', 'unlisted', 'private'], default='private')
 	args = parser.parse_args()
 
 	headers_v3['Client-ID'] = args.client_id
