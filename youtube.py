@@ -93,8 +93,6 @@ class YoutubeUploader:
 				except HttpError as e:
 					if e.resp.status in [500, 502, 503, 504]:
 						error = "A retriable HTTP error %d occurred:\n%s" % (e.resp.status, e.content)
-					elif e.resp.status == 404:
-						return None
 					else:
 						raise
 				except httplib2.HttpLib2Error as e:
@@ -111,10 +109,15 @@ class YoutubeUploader:
 				print("Sleeping %f seconds and then retrying..." % sleep_seconds)
 				time.sleep(sleep_seconds)
 
-		result = upload_process()
-		while(result == None): #Retry the whole upload until True is returned
-			print("Retrying whole upoad because 404 error")
-			time.sleep(10)
-			result = upload_process()
+		result = None
+		while result is None: #Retry the whole upload until True is returned
+			try:
+				print('debug starting upload')
+				result = upload_process()
+			except HttpError as e:
+				print("Unretriable error occured while uploading:")
+				print(e)
+				print("retrying in 60 seconsd")
+				time.sleep(60)
 		print("Finished upload with id %s" % result)
 		return result
