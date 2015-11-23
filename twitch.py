@@ -5,8 +5,7 @@ import os
 import io
 
 from youtube import YoutubeUploader
-
-#TODO: switch to youtube-dl again because livestreamer often arborts download too early
+import twitch_downloader
 
 headers_v3 = {
     'Accept': 'application/vnd.twitchtv.v3+json',
@@ -24,7 +23,8 @@ def json_to_video( json ):
 		'title': json['title'],
 		'description': json['description'],
 		'recorded_at': json['recorded_at'],
-		'length': json['length'] }
+		'length': json['length'],
+		'status': json['status'] }
 
 def get_video( id ):
 # Return a video in the internal format. The video is specified by its video id according to the Twitch api.
@@ -34,17 +34,15 @@ def get_video( id ):
 	return json_to_video( json )
 
 
-def get_videos( channel_name, last_video=None, legacy_mode=True ):
+def get_videos( channel_name, last_video=None ):
 	#last video is none or the id of a video
 	#if it is not none only videos that come before last video are returned
 	url = 'https://api.twitch.tv/kraken/channels/{}/videos'.format( channel_name )
 	videos_per_page = 100 #100 is the maximum videos we can request per call
-	if legacy_mode: hls = 'false'
-	else: hls = 'true'
 	payload = { 'limit': videos_per_page,
                     'offset': 0,
                     'broadcasts': 'true',
-                    'hls': hls }
+                    'hls': True }
 	def get_page( pagenumber ):
 		_payload = payload.copy()
 		_payload['offset'] = pagenumber * videos_per_page
@@ -53,7 +51,11 @@ def get_videos( channel_name, last_video=None, legacy_mode=True ):
 		videos = json['videos']
 		result = []
 		for v in videos:
-			result.append( json_to_video( v ) )
+			video = json_to_video( v )
+			if video['status'] != 'recording':
+				result.append(video) #Skip a video if it is currently live
+			else:
+				print('Skipped video {} because it is still recording aka live'.format(video['id']))
 		return result
 	videos = []
 	index = 0
@@ -68,20 +70,12 @@ def get_videos( channel_name, last_video=None, legacy_mode=True ):
 	return videos
 
 def download_video( video, args ):
-# TODO: call livestreamer over python module, not command line
-# Download a video from Twitch.
-# Considerations:
-# 	-livestreamer and youtube-dl --hls-prefer-native create the same output.
-# 	-youtube-dl without native hls uses ffmpeg for the download.
-#	-ffmpeg needs to correct the audio format with -bsf:a aac_adtstoasc which is done by youtube-dl automatically. Otherwise it has to be done manually to split files with ffmpeg.
-#	-Vods that have muted sections at the start will appear to contain no audio at all to ffmpeg and youtube (if uploaded in native format).
-#	 to work around this ffmpeg needs to look further ahead in the file with -probesize 9000000000000000000 -analyzeduration 9000000000000000000 for example.
-#	-Downloading with livestreamer is faster because of the thread option
 	if args.file_name:
 		filename = args.file_name
 	else:
 		filename = '{}.mp4'.format( video['id'] )
 	if args.file_already_exists: return filename
+	print("Starting download of", video['id'])
 	#command = [
 	#	'youtube-dl',
 	#	#'--hls-prefer-native',
@@ -89,24 +83,25 @@ def download_video( video, args ):
 	#	'--no-call-home',
 	#	'-o', filename,
 	#	video['url'] ]
-	command = [
-		'livestreamer',
-		'--hls-segment-threads', '1', #a higher number provides more download speed but it seems to sometimes cause read timeouts
-		'--hls-segment-timeout', '60',
-		'--hls-segment-attempts', '5',
-		'--stream-segment-attempts', '5',
-		#'--quiet',
-		'-o', filename,
-		video['url'], 'best' ]
+	#command = [
+	#	'livestreamer',
+	#	'--hls-segment-threads', '1', #a higher number provides more download speed but it seems to sometimes cause read timeouts
+	#	'--hls-segment-timeout', '60',
+	#	'--hls-segment-attempts', '5',
+	#	'--stream-segment-attempts', '5',
+	#	#'--quiet',
+	#	'-o', filename,
+	#	video['url'], 'best' ]
 
-	if args.dry_run:
-		command.append( '--simulate' )
-	print( "Invoking download:", command )
-	process = subprocess.Popen( command )
-	process.wait()
-	if process.returncode != 0:
-		print( "Error while executing youtube-dl." )
-		raise RuntimeError("Youtube-dl did not return 0.")
+	#if args.dry_run:
+	#	command.append( '--simulate' )
+	#print( "Invoking download:", command )
+	#process = subprocess.Popen( command )
+	#process.wait()
+	#if process.returncode != 0:
+	#	print( "Error while executing youtube-dl." )
+	#	raise RuntimeError("Youtube-dl did not return 0.")
+	twitch_downloader.download_video(video['id'][1:], filename)
 	print( "Done downloading", video['id'] )
 	return filename
 
@@ -190,7 +185,6 @@ if __name__ == "__main__":
 	parser.add_argument( '--start-after', help='When in channel mode process only recordings newer than this video id' )
 	parser.add_argument( '--split-at', help='Split videos in parts of duration in seconds.', type=int, default=60*60*11 )
 	parser.add_argument( '--dry-run', help='Dont download or upload anything.', action='store_true' )
-	parser.add_argument( '--twitch-legacy-mode', help='Download only videos whose id start with a b instead of a v. Those videos are not created on twitch anymore but some old ones exist.', action='store_true' )
 	parser.add_argument( '--client-id', help='Your twitch application\'s client id', required=True )
 	parser.add_argument( '--dont-use-playlist', help='Do not automatically create a playlist for videos that get split in multiple parts.', action='store_true')
 	parser.add_argument( '--privacy', help='Upload videos as public, unlisted or private', choices=['public', 'unlisted', 'private'], default='private')
@@ -209,7 +203,7 @@ if __name__ == "__main__":
 				start_after = state_file.readline().rstrip('\n')
 		else:
 			start_after = args.start_after
-		videos = get_videos( args.destination_id, start_after, args.twitch_legacy_mode )
+		videos = get_videos( args.destination_id, start_after )
 		videos.reverse()
 		for video in videos:
 			process_single_video( video, youtube_uploader, args )
