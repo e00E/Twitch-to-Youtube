@@ -65,7 +65,11 @@ class YoutubeUploader:
 
 		snippet = dict()
 		if title: snippet["title"] = title
-		if description: snippet["description"] = description
+		if description:
+			# these brackets are not allowed in youtube descriptions
+			description = description.replace('<', '}')
+			description = description.replace('>', '{')
+			snippet["description"] = description
 		if category: snippet["categoryId"] = category
 		if tags: snippet["tags"] = tags
 		body=dict(
@@ -114,7 +118,7 @@ class YoutubeUploader:
 			try:
 				print('debug starting upload')
 				result = upload_process()
-			except HttpError as e:
+			except (HttpError, ConnectionResetError) as e:
 				print("Unretriable error occured while uploading:")
 				print(e)
 				print("retrying in 60 seconsd")

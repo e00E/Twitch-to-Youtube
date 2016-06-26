@@ -29,7 +29,10 @@ def get_variant_playlist(video_id):
 	r = requests.get(twitch_usher_url + "/vod/{}".format(video_id), params=params)
 	r.encoding = 'utf-8'
 	logging.debug('get_variant_playlist for video_id {} got data {}'.format(video_id, r.content))
-	return m3u8.loads(r.text)
+	#Some playlists have bandwidth set to none which is not valid m3u8 and will crash the parser
+	#we dont care about the value so fix it by setting it something
+	text = r.text.replace(',BANDWIDTH=None,', ',BANDWIDTH=1,')
+	return m3u8.loads(text)
 
 def get_source_playlist(video_id):
 	variant_playlist = get_variant_playlist(video_id)

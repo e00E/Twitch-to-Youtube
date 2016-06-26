@@ -9,7 +9,7 @@ import twitch_downloader
 
 headers_v3 = {
     'Accept': 'application/vnd.twitchtv.v3+json',
-    'Client-ID': '' }
+    'Client-ID': 'ic9pyqao6c3c207460ad5v62dvmobo0' }
 
 default_tags = ["twitch","stream","vod","vods","broadcast","broadcasts","archive","archives","recording","recordings"]
 
