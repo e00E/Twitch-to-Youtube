@@ -6,10 +6,11 @@ import io
 
 from youtube import YoutubeUploader
 import twitch_downloader
+from TwitchIO import TwitchIO
 
 headers_v3 = {
     'Accept': 'application/vnd.twitchtv.v3+json',
-    'Client-ID': 'ic9pyqao6c3c207460ad5v62dvmobo0' }
+    'Client-ID': '' }
 
 default_tags = ["twitch","stream","vod","vods","broadcast","broadcasts","archive","archives","recording","recordings"]
 
@@ -69,49 +70,13 @@ def get_videos( channel_name, last_video=None ):
 		page = get_page( index )
 	return videos
 
-def download_video( video, args ):
-	if args.file_name:
-		filename = args.file_name
-	else:
-		filename = '{}.mp4'.format( video['id'] )
-	if args.file_already_exists: return filename
-	print("Starting download of", video['id'])
-	#command = [
-	#	'youtube-dl',
-	#	#'--hls-prefer-native',
-	#	'--quiet',
-	#	'--no-call-home',
-	#	'-o', filename,
-	#	video['url'] ]
-	#command = [
-	#	'livestreamer',
-	#	'--hls-segment-threads', '1', #a higher number provides more download speed but it seems to sometimes cause read timeouts
-	#	'--hls-segment-timeout', '60',
-	#	'--hls-segment-attempts', '5',
-	#	'--stream-segment-attempts', '5',
-	#	#'--quiet',
-	#	'-o', filename,
-	#	video['url'], 'best' ]
-
-	#if args.dry_run:
-	#	command.append( '--simulate' )
-	#print( "Invoking download:", command )
-	#process = subprocess.Popen( command )
-	#process.wait()
-	#if process.returncode != 0:
-	#	print( "Error while executing youtube-dl." )
-	#	raise RuntimeError("Youtube-dl did not return 0.")
-	twitch_downloader.download_video(video['id'][1:], filename)
-	print( "Done downloading", video['id'] )
-	return filename
-
 def get_video_title(video, part_number=None):
 	title = '{} stream from {}'.format( video['channel_name'], video['recorded_at'] )
 	if part_number is not None:
 		title += ' part {}'.format( part_number )
 	return title
 
-def upload_video( video, filename, args, youtube_uploader, part_number = None ):
+def upload_video( video, args, youtube_uploader, part_number = None ):
 	if args.dont_use_default_tags:
 		tags = args.tags.split(",")
 	else:
@@ -120,55 +85,21 @@ def upload_video( video, filename, args, youtube_uploader, part_number = None ):
 	description = 'Original title: {}\nOriginal description: {}\nOriginal date: {}\nOriginal Twitch id: {}'.format(
 		video['title'],
 		video['description'],
-		video['recorded_at'], video['id'] ) #not sure if the unicode encode thing is needed
+		video['recorded_at'], video['id'] )
 
+	print('Creating TwitchIO')
+	media_body = YoutubeUploader.iobase_to_media_body(TwitchIO(video['id'][1:]))
 	print("Starting upload")
-	youtube_video_id = youtube_uploader.upload(filename, title, description, "20", tags, args.privacy)
+	youtube_video_id = youtube_uploader.upload(media_body, title, description, "20", tags, args.privacy)
 	print( "Done uploading", video['id'], "as", youtube_video_id )
 	return youtube_video_id
 
-def split_video( filename, video_length, part_length ):
-	#All durations are in seconds
-	extra_length = 1 #make each part a bit longer to make sure youtube does not loose anything
-	print( "Splitting", filename, "every", part_length, "seconds." )
-	for current_time in range( 0, video_length, part_length ):
-		part_name = str(current_time) + filename
-		command = [
-			'ffmpeg',
-			'-loglevel', 'warning',
-			'-i', filename,
-			'-bsf:a', 'aac_adtstoasc',
-			'-codec', 'copy',
-			'-ss', str(current_time), #seek after -i for accuracy
-			'-t', str(part_length + extra_length), #ffmpeg will correctly split the lsat part even if the -t paramter wwould be too longV
-			part_name ]
-		print( "Invoking ffmpeg with command:", command )
-		process = subprocess.Popen( command );
-		process.wait()
-		if process.returncode != 0:
-			print( "Error while splitting file." )
-			raise RuntimeError("Ffmpeg did not return 0.")
-		yield part_name
-
 def process_single_video( video, youtube_uploader, args ):
-	filename = download_video( video, args )
-	if video['length'] > args.split_at:
-		if not args.dont_use_playlist:
-			playlist_id = youtube_uploader.create_playlist(get_video_title(video), privacyStatus="public")['id']
-		part_number = 1
-		for part_name in split_video( filename, video['length']+1, args.split_at ):
-			youtube_video_id = upload_video( video, part_name, args, youtube_uploader, part_number )
-			if not args.dont_use_playlist:
-				youtube_uploader.add_to_playlist(playlist_id, youtube_video_id)
-			os.remove( part_name )
-			part_number += 1
-	else:
-		upload_video( video, filename, args, youtube_uploader )
+	# TODO splitting
+	upload_video( video, args, youtube_uploader )
 	if args.state_file:
 		with open( args.state_file, 'w' ) as state_file:
 			state_file.writelines( [video['id'] + '\n'] )
-	if not args.dont_delete_after_upload:
-		os.remove( filename )
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser( description='Automatically upload twitch vods to youtube.' )
@@ -177,9 +108,6 @@ if __name__ == "__main__":
 	parser.add_argument( '--state-file', help='The file that contains the state for channel uploads.' )
 	parser.add_argument( '--upload-type', choices=['channel', 'video'], help='Upload a whole channel or a single video.', required=True )
 	parser.add_argument( '--destination-id', help='Channel or video id of location to be processed.', required=True )
-	parser.add_argument( '--file-name', help='Custom file name if processing a single video' )
-	parser.add_argument( '--file-already-exists', help='If the video was already downloaded and does not need to be downloaded again.', action='store_true')
-	parser.add_argument( '--dont-delete-after-upload', help='Do not clean up the downloaded file after it was successfully uploaded.', action='store_true' )
 	parser.add_argument( '--tags', help='Addtional tags for the uploaded videos, comma separated.', default='')
 	parser.add_argument( '--dont-use-default-tags', help='Do not add the default tags to the video.', action='store_true' )
 	parser.add_argument( '--start-after', help='When in channel mode process only recordings newer than this video id' )

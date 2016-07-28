@@ -4,7 +4,7 @@ import httplib2
 
 from apiclient.discovery import build
 from apiclient.errors import HttpError
-from apiclient.http import MediaFileUpload
+from apiclient.http import MediaFileUpload, MediaIoBaseUpload
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.file import Storage
 from oauth2client.tools import argparser, run_flow
@@ -60,7 +60,11 @@ class YoutubeUploader:
 						kind="youtube#video",
 						videoId=video_id)))).execute()
 		return response
-	def upload(self, filename, title=None, description=None, category=None, tags=None, privacyStatus="private"):
+	def file_to_media_body(filename):
+		return MediaFileUpload(filename, chunksize=-1, resumable=True)
+	def iobase_to_media_body(iobase):
+		return MediaIoBaseUpload(iobase, mimetype='application/octet-stream', chunksize=-1, resumable=True)
+	def upload(self, media_body, title=None, description=None, category=None, tags=None, privacyStatus="private"):
 		assert(privacyStatus in ["public", "private", "unlisted"])
 
 		snippet = dict()
@@ -81,7 +85,7 @@ class YoutubeUploader:
 			insert_request = self.youtube_api.videos().insert(
 				part=",".join(body.keys()),
 				body=body,
-				media_body=MediaFileUpload(filename, chunksize=-1, resumable=True))
+				media_body=media_body)
 
 			response = None
 			error = None
