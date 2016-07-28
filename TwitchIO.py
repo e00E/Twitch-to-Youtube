@@ -11,7 +11,7 @@ import time
 
 # This class provides an IOBase interface to a Twitch video
 # This means the contents of the video can be accessed like a file with reading and seeking.
-# To achieve it we first send a head request to every chunk in the playlist
+# To achieve it we parse the urls in the playlist
 # and keep lists of which chunk contains what byte offset (and video duration).
 # With that list we know the total size of the video and can map an offset to a chunk via bisecting the list.
 # The class always caches the last used chunk.
@@ -19,7 +19,6 @@ import time
 # The class was created to allow videos to be downloaded from twitch and uploaded to youtube
 # without needing to keep the whole files on disk.
 class TwitchIO(IOBase):
-	def
 	def __init__(self, video_id):
 		# video_id is just a string of numbers and does not start with a v
 		self.segments = twitch_downloader.get_source_playlist(video_id).segments
@@ -30,38 +29,41 @@ class TwitchIO(IOBase):
 		# Cache of last downloaded chunk
 		self.last_chunk_index = None
 		self.last_chunk = None
-	def partition(self, max_size=None, max_duration=None):
-		size = 0
-		duration = 0
-		segments = list()
-		i = 0
-		for i in range(len(self.segmetns)):
-			segment = self.segments[i]
-			segment_size = self.offset_index[i] - (self.offset_index[i-1] if i > 0 else 0)
-			segment_duration = self.time_index[i] - (self.time_index[i-1] if i > 0 else 0.0)
-		while i < len(self.segments) and (max_size == None or size < max_size) and (max_duration == None or duration < max_duration):
-
-
 	def build_index(self):
 		self.offset_index = list()
 		self.size = 0
 		self.time_index = list()
 		self.duration = 0.0
 		for segment in self.segments:
-			while True:
+			# Some older vods dont have start and end offsets in the playlist
+			# so for those we need to send head requests to get the chunk size
+			uri = segment.uri
+			parameters = uri[uri.rfind('?')+1:]
+			parameters = parameters.split('&')
+			keyvalues = dict()
+			for i in parameters:
 				try:
-					response = self.session.head(segment.uri, timeout=12.1)
-					response.raise_for_status()
-					size = int(response.headers['Content-Length'])
-					duration = segment.duration
-					self.size += size
-					self.offset_index.append(self.size)
-					self.duration += duration
-					self.time_index.append(self.duration)
-					break
-				except (requests.exceptions.RequestException, requests.exceptions.HTTPError) as e:
-					time.sleep(12.1)
+					(key, value) = i.split('=')
+					keyvalues[key] = int(value)
+				except ValueError as e:
 					continue
+			if 'start_offset' in keyvalues and 'end_offset' in keyvalues:
+				self.size += keyvalues['end_offset'] - keyvalues['start_offset'] + 1 # + 1 because those ranges are inclusive
+			else:
+				while True:
+					try:
+						response = self.session.head(segment.uri, timeout=12.1)
+						response.raise_for_status()
+						size = int(response.headers['Content-Length'])
+						self.size += size
+						break
+					except (requests.exceptions.RequestException, requests.exceptions.HTTPError) as e:
+						time.sleep(12.1)
+						continue
+			duration = segment.duration
+			self.offset_index.append(self.size)
+			self.duration += duration
+			self.time_index.append(self.duration)
 	def seek(self, offset, whence=0):
 		if whence == 0:
 			pos = offset
