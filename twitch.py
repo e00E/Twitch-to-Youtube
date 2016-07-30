@@ -25,6 +25,7 @@ def json_to_video( json ):
 		'description': json['description'],
 		'recorded_at': json['recorded_at'],
 		'length': json['length'],
+		'game': json['game'],
 		'status': json['status'] }
 
 def get_video( id ):
@@ -134,6 +135,7 @@ if __name__ == "__main__":
 	parser.add_argument( '--client-id', help='Your twitch application\'s client id', required=True )
 	parser.add_argument( '--dont-use-playlist', help='Do not automatically create a playlist for videos that get split in multiple parts.', action='store_true')
 	parser.add_argument( '--privacy', help='Upload videos as public, unlisted or private', choices=['public', 'unlisted', 'private'], default='private')
+	parser.add_argument( '--game-filter', help='When in channel mode, upload only videos where game matches.', required=False)
 	args = parser.parse_args()
 
 	headers_v3['Client-ID'] = args.client_id
@@ -152,7 +154,10 @@ if __name__ == "__main__":
 		videos = get_videos( args.destination_id, start_after )
 		videos.reverse()
 		for video in videos:
-			process_single_video( video, youtube_uploader, args )
+			if args.game_filter and video['game'] == args.game_filter:
+				process_single_video( video, youtube_uploader, args )
+			else:
+				print('Skipping', video['id'], 'because it does not match game.')
 	elif args.upload_type == 'video':
 		video = get_video( args.destination_id )
 		process_single_video( video, youtube_uploader, args )
