@@ -21,16 +21,51 @@ import sys
 # The class was created to allow videos to be downloaded from twitch and uploaded to youtube
 # without needing to keep the whole files on disk.
 class TwitchIO(IOBase):
-	def __init__(self, video_id):
-		# video_id is just a string of numbers and does not start with a v
-		self.segments = twitch_downloader.get_source_playlist(video_id).segments
+	def __init__(self, segments, build_index=True):
+		self.segments = segments
 		self.session = requests.Session()
-		self.build_index()
+		if build_index:
+			self.build_index()
 		self.position = 0
 		self.index = None
 		# Cache of last downloaded chunk
 		self.last_chunk_index = None
 		self.last_chunk = None
+	def from_twitch(video_id):
+		# video_id is just a string of numbers and does not start with a v
+		return TwitchIO(twitch_downloader.get_source_playlist(video_id).segments)
+	def split_parts(self, max_size=None, max_duration=None):
+		size = 0
+		duration = 0.0
+		offset_index = list()
+		time_index = list()
+		segments = list()
+		def create_part():
+			part = TwitchIO(segments, build_index=False)
+			part.size = size
+			part.duration = duration
+			part.offset_index = offset_index
+			part.time_index = time_index
+			return part
+		for i, segment in enumerate(self.segments):
+			current_size = self.offset_index[i] - (self.offset_index[i-1] if i > 0 else 0)
+			current_duration = self.time_index[i] - (self.time_index[i-1] if i > 0 else 0)
+			# if a part cannot grow anymore but has at least one segment
+			if len(segments) > 0:
+				if (max_size != None and size + current_size > max_size) or (max_duration != None and duration + current_duration > max_duration):
+					yield create_part()
+					# reset values for next part
+					size = 0
+					duration = 0.0
+					offset_index = list()
+					time_index = list()
+					segments = list()
+			segments.append(segment)
+			size += self.offset_index[i] - (self.offset_index[i-1] if i > 0 else 0)
+			duration += self.time_index[i] - (self.time_index[i-1] if i > 0 else 0)
+			offset_index.append(size)
+			time_index.append(duration)
+		yield create_part()
 	def build_index(self):
 		self.offset_index = list()
 		self.size = 0
@@ -60,7 +95,7 @@ class TwitchIO(IOBase):
 						self.size += size
 						break
 					except (requests.exceptions.RequestException, requests.exceptions.HTTPError) as e:
-						logging.warning('Encounted following exception while trying to HEAD chunk {} {}'.format(index, e))
+						logging.warning('Encounted following exception while trying to HEAD chunk {} {}'.format(segment.uri, e))
 						time.sleep(12.1)
 						continue
 			duration = segment.duration
