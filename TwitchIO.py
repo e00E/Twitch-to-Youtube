@@ -5,6 +5,8 @@ import bisect
 import twitch_downloader
 import requests
 import time
+import logging
+import sys
 
 
 # TODO can make a bit faster by also caching the next chunk early in a seperate thread
@@ -58,6 +60,7 @@ class TwitchIO(IOBase):
 						self.size += size
 						break
 					except (requests.exceptions.RequestException, requests.exceptions.HTTPError) as e:
+						logging.warning('Encounted following exception while trying to HEAD chunk {} {}'.format(index, e))
 						time.sleep(12.1)
 						continue
 			duration = segment.duration
@@ -91,9 +94,11 @@ class TwitchIO(IOBase):
 				self.last_chunk = response.content
 				return self.last_chunk
 			except (requests.exceptions.RequestException, requests.exceptions.HTTPError) as e:
+				logging.warning('Encounted following exception while trying to download chunk {} {}'.format(index, e))
 				time.sleep(12.1)
 				continue
 	def read(self, size=-1):
+		print('\rread', self.position, self.size, size, '              ', end='')
 		assert(size == -1 or size >= 0)
 		end_position = self.size if size == -1 else min(self.position + size, self.size)
 

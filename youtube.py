@@ -122,7 +122,7 @@ class YoutubeUploader:
 			try:
 				print('debug starting upload')
 				result = upload_process()
-			except (HttpError, ConnectionResetError) as e:
+			except (HttpError, ConnectionError) as e:
 				print("Unretriable error occured while uploading:")
 				print(e)
 				print("retrying in 60 seconsd")

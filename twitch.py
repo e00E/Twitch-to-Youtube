@@ -87,7 +87,7 @@ def upload_video( video, args, youtube_uploader, part_number = None ):
 		video['description'],
 		video['recorded_at'], video['id'] )
 
-	print('Creating TwitchIO')
+	print('Creating TwitchIO for', video['id'])
 	media_body = YoutubeUploader.iobase_to_media_body(TwitchIO(video['id'][1:]))
 	print("Starting upload")
 	youtube_video_id = youtube_uploader.upload(media_body, title, description, "20", tags, args.privacy)
