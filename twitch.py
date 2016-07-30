@@ -76,23 +76,41 @@ def get_video_title(video, part_number=None):
 		title += ' part {}'.format( part_number )
 	return title
 
-def upload_video( video, args, youtube_uploader, part_number = None ):
+def upload_video( video, args, youtube_uploader):
 	if args.dont_use_default_tags:
 		tags = args.tags.split(",")
 	else:
 		tags = default_tags + args.tags.split(",")
-	title = get_video_title(video, part_number)
+	title = get_video_title(video)
 	description = 'Original title: {}\nOriginal description: {}\nOriginal date: {}\nOriginal Twitch id: {}'.format(
 		video['title'],
 		video['description'],
 		video['recorded_at'], video['id'] )
 
 	print('Creating TwitchIO for', video['id'])
-	media_body = YoutubeUploader.iobase_to_media_body(TwitchIO.from_twitch(video['id'][1:]))
-	print("Starting upload")
-	youtube_video_id = youtube_uploader.upload(media_body, title, description, "20", tags, args.privacy)
-	print( "Done uploading", video['id'], "as", youtube_video_id )
-	return youtube_video_id
+	twitchio = TwitchIO.from_twitch(video['id'][1:])
+	print('Video has size {}, real duration {}, twitch duration {}.'.format(twitchio.size, twitchio.duration, video['length'])
+	if twitchio.size > args.max_size or twitchio.duration > args.max_duration:
+		if twitchio.size > args.max_size: print('Video is over size limit of {}.'.format(args.max_size))
+		if twitchio.duration > args.max_duration: print('Video is over duration limit of {}.'.format(args.max_duration))
+		parts = [i for in twitchio.split_parts(args.max_size, args.max_duration)]
+		print('Therefore splitting in {} parts.'.format(len(parts)))
+		if not args.dont_use_playlist:
+			playlist_id = youtube_uploader.create_playlist(get_video_title(video), privacyStatus=args.privacy)
+			print('Created playlist with id {} for parts.'.format(playlist_id)
+		for i, part in enumerate(parts):
+			part_title = title + ' part {}'.format(i+1)
+			media_body = YoutubeUploader.iobase_to_media_body(twitchio)
+			print('Staring upload of part {}.'.format(i))
+			youtube_video_id = youtube_uploader.upload(media_body, part_title, description, "20", tags, args.privacy)
+			print('Finished uploading part as {}.'.format(youtube_video_id)
+			if not args.dont_use_playlist:
+				youtube_uploader.add_to_playlist(playlist_id, youtube_video_id)
+	else:
+		media_body = YoutubeUploader.iobase_to_media_body(twitchio)
+		print("Starting upload")
+		youtube_video_id = youtube_uploader.upload(media_body, title, description, "20", tags, args.privacy)
+		print( "Done uploading", video['id'], "as", youtube_video_id )
 
 def process_single_video( video, youtube_uploader, args ):
 	# TODO splitting
@@ -111,8 +129,8 @@ if __name__ == "__main__":
 	parser.add_argument( '--tags', help='Addtional tags for the uploaded videos, comma separated.', default='')
 	parser.add_argument( '--dont-use-default-tags', help='Do not add the default tags to the video.', action='store_true' )
 	parser.add_argument( '--start-after', help='When in channel mode process only recordings newer than this video id' )
-	parser.add_argument( '--split-at', help='Split videos in parts of duration in seconds.', type=int, default=60*60*11 )
-	parser.add_argument( '--dry-run', help='Dont download or upload anything.', action='store_true' )
+	parser.add_argument( '--max-duration', help='Split videos in parts of duration in seconds.', type=float, default=60*60*11 ) # default is max duration for youtube videos
+	parser.add_argument( '--max-size', help='Split videos in parts of size in bytes.', type=int, default=2**30 ) # default is max size for uploading videos to youtube via the api
 	parser.add_argument( '--client-id', help='Your twitch application\'s client id', required=True )
 	parser.add_argument( '--dont-use-playlist', help='Do not automatically create a playlist for videos that get split in multiple parts.', action='store_true')
 	parser.add_argument( '--privacy', help='Upload videos as public, unlisted or private', choices=['public', 'unlisted', 'private'], default='private')
