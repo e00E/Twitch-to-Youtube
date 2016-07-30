@@ -61,8 +61,8 @@ class TwitchIO(IOBase):
 					time_index = list()
 					segments = list()
 			segments.append(segment)
-			size += self.offset_index[i] - (self.offset_index[i-1] if i > 0 else 0)
-			duration += self.time_index[i] - (self.time_index[i-1] if i > 0 else 0)
+			size += current_size
+			duration += current_duration
 			offset_index.append(size)
 			time_index.append(duration)
 		yield create_part()

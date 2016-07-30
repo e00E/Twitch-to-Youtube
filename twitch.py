@@ -89,21 +89,21 @@ def upload_video( video, args, youtube_uploader):
 
 	print('Creating TwitchIO for', video['id'])
 	twitchio = TwitchIO.from_twitch(video['id'][1:])
-	print('Video has size {}, real duration {}, twitch duration {}.'.format(twitchio.size, twitchio.duration, video['length'])
+	print('Video has size {}, real duration {}, twitch duration {}.'.format(twitchio.size, twitchio.duration, video['length']))
 	if twitchio.size > args.max_size or twitchio.duration > args.max_duration:
 		if twitchio.size > args.max_size: print('Video is over size limit of {}.'.format(args.max_size))
 		if twitchio.duration > args.max_duration: print('Video is over duration limit of {}.'.format(args.max_duration))
-		parts = [i for in twitchio.split_parts(args.max_size, args.max_duration)]
+		parts = [i for i in twitchio.split_parts(args.max_size, args.max_duration)]
 		print('Therefore splitting in {} parts.'.format(len(parts)))
 		if not args.dont_use_playlist:
-			playlist_id = youtube_uploader.create_playlist(get_video_title(video), privacyStatus=args.privacy)
-			print('Created playlist with id {} for parts.'.format(playlist_id)
+			playlist_id = youtube_uploader.create_playlist(get_video_title(video), privacyStatus=args.privacy)['id']
+			print('Created playlist with id {} for parts.'.format(playlist_id))
 		for i, part in enumerate(parts):
 			part_title = title + ' part {}'.format(i+1)
-			media_body = YoutubeUploader.iobase_to_media_body(twitchio)
-			print('Staring upload of part {}.'.format(i))
+			media_body = YoutubeUploader.iobase_to_media_body(part)
+			print('Starting upload of part {}.'.format(i))
 			youtube_video_id = youtube_uploader.upload(media_body, part_title, description, "20", tags, args.privacy)
-			print('Finished uploading part as {}.'.format(youtube_video_id)
+			print('Finished uploading part as {}.'.format(youtube_video_id))
 			if not args.dont_use_playlist:
 				youtube_uploader.add_to_playlist(playlist_id, youtube_video_id)
 	else:
