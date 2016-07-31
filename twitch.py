@@ -131,7 +131,7 @@ if __name__ == "__main__":
 	parser.add_argument( '--dont-use-default-tags', help='Do not add the default tags to the video.', action='store_true' )
 	parser.add_argument( '--start-after', help='When in channel mode process only recordings newer than this video id' )
 	parser.add_argument( '--max-duration', help='Split videos in parts of duration in seconds.', type=float, default=60*60*11 ) # default is max duration for youtube videos
-	parser.add_argument( '--max-size', help='Split videos in parts of size in bytes.', type=int, default=2**30 ) # default is max size for uploading videos to youtube via the api
+	parser.add_argument( '--max-size', help='Split videos in parts of size in bytes.', type=int, default=64*(2**30) ) # default is max size for uploading videos to youtube via the api
 	parser.add_argument( '--client-id', help='Your twitch application\'s client id', required=True )
 	parser.add_argument( '--dont-use-playlist', help='Do not automatically create a playlist for videos that get split in multiple parts.', action='store_true')
 	parser.add_argument( '--privacy', help='Upload videos as public, unlisted or private', choices=['public', 'unlisted', 'private'], default='private')
