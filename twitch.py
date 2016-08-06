@@ -91,6 +91,9 @@ def upload_video( video, args, youtube_uploader):
 	print('Creating TwitchIO for', video['id'])
 	twitchio = TwitchIO.from_twitch(video['id'][1:])
 	print('Video has size {}, real duration {}, twitch duration {}.'.format(twitchio.size, twitchio.duration, video['length']))
+	if twitchio.size == 0 or twitchio.duration == 0.0:
+		print('Skipping video because size or duration is 0.')
+		return
 	if twitchio.size > args.max_size or twitchio.duration > args.max_duration:
 		if twitchio.size > args.max_size: print('Video is over size limit of {}.'.format(args.max_size))
 		if twitchio.duration > args.max_duration: print('Video is over duration limit of {}.'.format(args.max_duration))
@@ -154,7 +157,7 @@ if __name__ == "__main__":
 		videos = get_videos( args.destination_id, start_after )
 		videos.reverse()
 		for video in videos:
-			if args.game_filter and video['game'] == args.game_filter:
+			if args.game_filter == None or video['game'] == args.game_filter:
 				process_single_video( video, youtube_uploader, args )
 			else:
 				print('Skipping', video['id'], 'because it does not match game.')
