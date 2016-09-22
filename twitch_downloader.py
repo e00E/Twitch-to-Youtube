@@ -9,14 +9,14 @@ import m3u8
 twitch_api_url = "https://api.twitch.tv"
 twitch_usher_url = "http://usher.twitch.tv"
 
-def get_session(video_id):
-	r = requests.get(twitch_api_url + "/api/vods/{}/access_token".format(video_id))
+def get_session(video_id, headers=dict()):
+	r = requests.get(twitch_api_url + "/api/vods/{}/access_token".format(video_id), headers=headers)
 	logging.debug("get_session for video_id {} got data {}".format(video_id, r.content))
 	json = r.json()
 	return (json['token'], json['sig'])
 
-def get_variant_playlist(video_id):
-	token, sig = get_session(video_id)
+def get_variant_playlist(video_id, headers=dict()):
+	token, sig = get_session(video_id, headers)
 	params = {
 		"player": "twitchweb",
 		"p": int(random() * 999999),
@@ -34,8 +34,8 @@ def get_variant_playlist(video_id):
 	text = r.text.replace(',BANDWIDTH=None,', ',BANDWIDTH=1,')
 	return m3u8.loads(text)
 
-def get_source_playlist(video_id):
-	variant_playlist = get_variant_playlist(video_id)
+def get_source_playlist(video_id, headers=dict()):
+	variant_playlist = get_variant_playlist(video_id, headers)
 	for playlist in variant_playlist.playlists:
 		for media in playlist.media:
 			if media.group_id == 'chunked': # Corresponds to Source quality

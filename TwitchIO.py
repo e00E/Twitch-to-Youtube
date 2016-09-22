@@ -31,9 +31,9 @@ class TwitchIO(IOBase):
 		# Cache of last downloaded chunk
 		self.last_chunk_index = None
 		self.last_chunk = None
-	def from_twitch(video_id):
+	def from_twitch(video_id, headers=dict()):
 		# video_id is just a string of numbers and does not start with a v
-		return TwitchIO(twitch_downloader.get_source_playlist(video_id).segments)
+		return TwitchIO(twitch_downloader.get_source_playlist(video_id, headers).segments)
 	def split_parts(self, max_size=None, max_duration=None):
 		size = 0
 		duration = 0.0
@@ -133,7 +133,7 @@ class TwitchIO(IOBase):
 				time.sleep(12.1)
 				continue
 	def read(self, size=-1):
-		print('\rread', self.position, self.size, size, '              ', end='')
+		#print('\rread', self.position, self.size, size, '              ', end='')
 		assert(size == -1 or size >= 0)
 		end_position = self.size if size == -1 else min(self.position + size, self.size)
 

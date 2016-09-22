@@ -5,7 +5,6 @@ import os
 import io
 
 from youtube import YoutubeUploader
-import twitch_downloader
 from TwitchIO import TwitchIO
 
 headers_v3 = {
@@ -89,7 +88,7 @@ def upload_video( video, args, youtube_uploader):
 		video['recorded_at'], video['id'] )
 
 	print('Creating TwitchIO for', video['id'])
-	twitchio = TwitchIO.from_twitch(video['id'][1:])
+	twitchio = TwitchIO.from_twitch(video['id'][1:], headers=headers_v3)
 	print('Video has size {}, real duration {}, twitch duration {}.'.format(twitchio.size, twitchio.duration, video['length']))
 	if twitchio.size == 0 or twitchio.duration == 0.0:
 		print('Skipping video because size or duration is 0.')
@@ -133,7 +132,7 @@ if __name__ == "__main__":
 	parser.add_argument( '--tags', help='Addtional tags for the uploaded videos, comma separated.', default='')
 	parser.add_argument( '--dont-use-default-tags', help='Do not add the default tags to the video.', action='store_true' )
 	parser.add_argument( '--start-after', help='When in channel mode process only recordings newer than this video id' )
-	parser.add_argument( '--max-duration', help='Split videos in parts of duration in seconds.', type=float, default=60*60*11 ) # default is max duration for youtube videos
+	parser.add_argument( '--max-duration', help='Split videos in parts of duration in seconds.', type=float, default=60*60*10 ) # default is max duration for youtube videos
 	parser.add_argument( '--max-size', help='Split videos in parts of size in bytes.', type=int, default=64*(2**30) ) # default is max size for uploading videos to youtube via the api
 	parser.add_argument( '--client-id', help='Your twitch application\'s client id', required=True )
 	parser.add_argument( '--dont-use-playlist', help='Do not automatically create a playlist for videos that get split in multiple parts.', action='store_true')
