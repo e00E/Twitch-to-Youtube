@@ -1,6 +1,7 @@
 import random
 import time
 import httplib2
+import logging
 
 from apiclient.discovery import build
 from apiclient.errors import HttpError
@@ -68,11 +69,18 @@ class YoutubeUploader:
 		assert(privacyStatus in ["public", "private", "unlisted"])
 
 		snippet = dict()
-		if title: snippet["title"] = title
+		if title:
+			title = title.replace('<', '}')
+			title = title.replace('>', '{')
+			if len(title.encode()) > 100:
+				logging.warning("Title is longer than Youtube limit of 100 bytes")
+			snippet["title"] = title
 		if description:
 			# these brackets are not allowed in youtube descriptions
 			description = description.replace('<', '}')
 			description = description.replace('>', '{')
+			if len(description.encode()) > 5000:
+				logging.warning("Description is longer than Youtube limit of 5000 bytes")
 			snippet["description"] = description
 		if category: snippet["categoryId"] = category
 		if tags: snippet["tags"] = tags

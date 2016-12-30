@@ -71,7 +71,7 @@ def get_videos( channel_name, last_video=None ):
 	return videos
 
 def get_video_title(video, part_number=None):
-	title = '{} stream from {}'.format( video['channel_name'], video['recorded_at'] )
+	title = '{} from {}'.format(video['title'], video['recorded_at'])
 	if part_number is not None:
 		title += ' part {}'.format( part_number )
 	return title
