@@ -67,20 +67,28 @@ class YoutubeUploader:
 		return MediaIoBaseUpload(iobase, mimetype='application/octet-stream', chunksize=-1, resumable=True)
 	def upload(self, media_body, title=None, description=None, category=None, tags=None, privacyStatus="private"):
 		assert(privacyStatus in ["public", "private", "unlisted"])
+		def shorten_str_to_bytes(max_bytes, string):
+			while string.encode() > max_bytes:
+				string = string[:-1]
+			return string
 
 		snippet = dict()
 		if title:
 			title = title.replace('<', '}')
 			title = title.replace('>', '{')
-			if len(title.encode()) > 100:
-				logging.warning("Title is longer than Youtube limit of 100 bytes")
+			encoded_title = title.encode()
+			if len(encoded_title) > 100:
+				logging.warning("Title is longer than Youtube limit of 100 bytes, shortening it")
+				# Keep removing last character and re-encoding until encoded size is short enough
+				title = shorten_str_to_bytes(100, title)
 			snippet["title"] = title
 		if description:
 			# these brackets are not allowed in youtube descriptions
 			description = description.replace('<', '}')
 			description = description.replace('>', '{')
 			if len(description.encode()) > 5000:
-				logging.warning("Description is longer than Youtube limit of 5000 bytes")
+				logging.warning("Description is longer than Youtube limit of 5000 bytes, shortening it")
+				description = shorten_str_to_bytes(5000, description)
 			snippet["description"] = description
 		if category: snippet["categoryId"] = category
 		if tags: snippet["tags"] = tags
