@@ -68,7 +68,7 @@ class YoutubeUploader:
 	def upload(self, media_body, title=None, description=None, category=None, tags=None, privacyStatus="private"):
 		assert(privacyStatus in ["public", "private", "unlisted"])
 		def shorten_str_to_bytes(max_bytes, string):
-			while string.encode() > max_bytes:
+			while len(string.encode()) > max_bytes:
 				string = string[:-1]
 			return string
 
